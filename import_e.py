@@ -378,6 +378,18 @@ def parse_E(filepath, zero_indexed_materials=False, hexadecimal_materials=False)
                 # see hexadecimal digits, and then retry, this time insisting
                 # on hexadecimal.
                 mat_id = tokenizer.next_and_check(',')
+
+                #### AAAAARGH: the material id style can be different for
+                #### different parts in the .e! WHY????????????
+                #### bintoe's conversion of adwlite.bin has 0-based ids (base is
+                #### ambiguous, because <10 materials) in the main object, and
+                #### 1-based hex ids in the second object (the vhot).
+                ####
+                #### (also another example of the `ff06` style material ids,
+                #### which surely signifies something _other_ than just "haha
+                #### remember to only take the low 8 bits haha")
+                #print("mat_id: "+repr(mat_id))
+
                 if hexadecimal_materials:
                     mat = int(mat_id, 16)
                 else:
@@ -387,21 +399,33 @@ def parse_E(filepath, zero_indexed_materials=False, hexadecimal_materials=False)
                         print("PARTS has hexadecimal material ids; retrying import.")
                         raise PartMaterialsHexadecimal("hexadecimal material index",
                                         tokenizer.line, tokenizer.column)
-                mat = mat & 0xFF
 
-                # 3DS2E outputs 1-based material ids, so we should really only
-                # accept that. But Shadowspawn's BINTOE.EXE sometimes outputs
-                # a .e with 1-indexed material numbers in the PARTS section,
-                # and sometimes outputs 0-indexed material numbers there. So
-                # if we encounter the latter, we signal it with this exception;
-                # the import will be retried, and this time we adjusted all the
-                # PARTS material numbers.
-                if zero_indexed_materials:
-                    mat += 1;
-                elif mat==0:
-                    print("PARTS has zero-indexed materials; retrying import.")
-                    raise PartMaterialsZeroIndexed("zero material index",
-                                    tokenizer.line, tokenizer.column)
+                # DO NOT COMMIT THIS!!!!
+                #
+                # i dont know if this change is the reason, but this is completely
+                # fucking up the import of elecspot/elecspo2, just like it does with
+                # adwlite. bad material/uv assignment and stuff, it seems. idk.
+
+                if mat & 0xff00:
+                    # For vhots, bintoe always seems to assign a material id like
+                    # 'ff01', meaning material 1 (1-based) + something?. We
+                    # just and off the upper bits; and ensure that we ignore the
+                    # zero_indexed_materials mode for this material.
+                    mat = mat & 0xff
+                else:
+                    # 3DS2E outputs 1-based material ids, so we should really only
+                    # accept that. But Shadowspawn's BINTOE.EXE sometimes outputs
+                    # a .e with 1-indexed material numbers in the PARTS section,
+                    # and sometimes outputs 0-indexed material numbers there. So
+                    # if we encounter the latter, we signal it with this exception;
+                    # the import will be retried, and this time we adjusted all the
+                    # PARTS material numbers.
+                    if zero_indexed_materials:
+                        mat += 1;
+                    elif mat==0:
+                        print("PARTS has zero-indexed materials; retrying import.")
+                        raise PartMaterialsZeroIndexed("zero material index",
+                                        tokenizer.line, tokenizer.column)
 
                 if (mat < 1 or mat > len(root['MATERIALS'])
                 or not root['MATERIALS'][mat-1]):

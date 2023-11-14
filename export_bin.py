@@ -41,6 +41,27 @@ else:
 # EXPORT
 ######################################################
 
+
+BSDF_NODE_TYPES = (
+    bpy.types.ShaderNodeBsdfDiffuse,
+    bpy.types.ShaderNodeBsdfGlass,
+    bpy.types.ShaderNodeBsdfGlossy,
+    bpy.types.ShaderNodeBsdfPrincipled,
+    bpy.types.ShaderNodeBsdfToon,
+    bpy.types.ShaderNodeBsdfTranslucent,
+    bpy.types.ShaderNodeBsdfTransparent,
+    )
+
+def find_bsdf_node(node):
+    cls = type(node)
+    while cls not in BSDF_NODE_TYPES:
+        if cls is bpy.types.ShaderNodeMixShader:
+            node = node.inputs[1].links[0].from_node
+            cls = type(node)
+        else:
+            raise TypeError(cls)
+    return node
+
 #2.80 added this def:
 def get_diffuse_texture(material):
     mNodes = material.node_tree.nodes
@@ -50,6 +71,7 @@ def get_diffuse_texture(material):
 
     #get whatever shader is the surface input to the material node - likely to be Diffuse BSDF or Principled BSDF
     shaderNode = matOutputNode.inputs[0].links[0].from_node
+    shaderNode = find_bsdf_node(shaderNode)
 
     #get the image texture that links to the shader node
     try:
@@ -67,6 +89,7 @@ def get_material_colour(material):
 
     #get whatever shader is the surface input to the material node - likely to be Diffuse BSDF or Principled BSDF
     shaderNode = matOutputNode.inputs[0].links[0].from_node
+    shaderNode = find_bsdf_node(shaderNode)
     
     #get the colour
     c = shaderNode.inputs[0].default_value
